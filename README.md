@@ -1,79 +1,74 @@
-Custom Allocators
+# Custom Allocators
 
-Custom Allocators is a collection of memory allocators implemented in modern C++.
+Custom Allocators is a collection of memory allocators written in modern C++23.
 
 It was built to explore:
-
-- custom memory management
+- manual memory management
 - memory alignment
 - object lifetime management
 - allocation strategies
-- memory fragmentation
-- allocator performance
+- fragmentation handling
+- performance differences between allocators
 
-This project is primarily educational and is not intended to replace production-grade allocators.
-The goal is to better understand how different allocation strategies work internally through custom implementations.
+This project is primarily educational and is not intended to replace standard allocators.
+The goal is to understand how memory allocation works internally.
 
 ---
 
-Implemented Allocators
+# Implemented Allocators
 
-ArenaAllocator
+## ArenaAllocator
 
-A linear allocator that allocates memory sequentially from a preallocated buffer.
+A linear allocator that allocates memory sequentially from a fixed buffer.
 
-Features
-
+### Features
 - Fast O(1) allocation
-- Bulk reset with "clear()"
-- Object creation and destruction
+- Bulk reset (`clear`)
+- Simple memory model
 - Alignment support
 
 ---
 
-PoolAllocator
+## PoolAllocator
 
-A fixed-size allocator designed for objects of identical size.
+A fixed-size allocator for objects of identical size.
 
-Features
-
+### Features
 - O(1) allocation
 - O(1) deallocation
-- Free-list implementation
-- Minimal fragmentation
+- Free list of blocks
+- No fragmentation (for fixed size objects)
 
 ---
 
-StackAllocator
+## StackAllocator
 
-A Last-In-First-Out (LIFO) allocator.
+A LIFO (last-in-first-out) allocator.
 
-Features
-
+### Features
 - O(1) allocation
-- Marker rollback
-- Scope rollback support
-- Object creation and destruction
+- Marker-based rollback
+- Scope-based memory control
 - Alignment support
 
 ---
 
-FreeListAllocator
+## FreeListAllocator
 
-A variable-size allocator that reuses freed memory blocks.
+A general-purpose allocator using a free list of memory blocks.
 
-Features
-
-- Variable-size allocations
+### Features
+- Variable size allocations
 - Block splitting
 - Block coalescing
-- Object creation and destruction
 - Alignment support
+- Object lifecycle support
 
 ---
 
-Project Structure
+# Project Structure
 
+```txt
 Custom Allocators/
 ├── ArenaAllocator/
 │   ├── include/
@@ -98,28 +93,35 @@ Custom Allocators/
     ├── benchmarks/
     ├── examples/
     └── tests/
+```
 
 ---
 
-Build
+# Build
 
-Example
+## Example
 
+```bash
 g++ -std=c++23 examples/example.cpp -Iinclude -o example
 ./example
+```
 
-Benchmark
+## Benchmark
 
+```bash
 g++ -std=c++23 benchmarks/benchmark.cpp -Iinclude -o benchmark
 ./benchmark
+```
 
-Test
+## Test
 
+```bash
 g++ -std=c++23 tests/test.cpp -Iinclude -o test
 ./test
+```
 
 ---
 
-License
+# License
 
 MIT License
