@@ -1,10 +1,24 @@
 Custom Allocators
 
-A collection of custom memory allocators implemented in modern C++23 for learning and experimentation with memory management techniques.
+Custom Allocators is a collection of memory allocators implemented in modern C++.
+
+It was built to explore:
+
+- custom memory management
+- memory alignment
+- object lifetime management
+- allocation strategies
+- memory fragmentation
+- allocator performance
+
+This project is primarily educational and is not intended to replace production-grade allocators.
+The goal is to better understand how different allocation strategies work internally through custom implementations.
+
+---
 
 Implemented Allocators
 
-Arena Allocator
+ArenaAllocator
 
 A linear allocator that allocates memory sequentially from a preallocated buffer.
 
@@ -12,116 +26,100 @@ Features
 
 - Fast O(1) allocation
 - Bulk reset with "clear()"
-- Object construction and destruction
+- Object creation and destruction
 - Alignment support
-
-Tradeoffs
-
-- Individual deallocation is not supported
-- Entire arena must be reset at once
 
 ---
 
-Pool Allocator
+PoolAllocator
 
-A fixed-size allocator that manages memory blocks of identical size.
+A fixed-size allocator designed for objects of identical size.
 
 Features
 
 - O(1) allocation
 - O(1) deallocation
-- Free-list based implementation
+- Free-list implementation
 - Minimal fragmentation
-
-Tradeoffs
-
-- All allocations must fit the configured block size
 
 ---
 
-Stack Allocator
+StackAllocator
 
 A Last-In-First-Out (LIFO) allocator.
 
 Features
 
 - O(1) allocation
-- O(1) rollback using markers
-- Scope-based rollback support
+- Marker rollback
+- Scope rollback support
+- Object creation and destruction
 - Alignment support
-
-Tradeoffs
-
-- Memory must be released in reverse allocation order
 
 ---
 
-Free List Allocator
+FreeListAllocator
 
-A variable-size allocator that reuses freed blocks.
+A variable-size allocator that reuses freed memory blocks.
 
 Features
 
 - Variable-size allocations
 - Block splitting
 - Block coalescing
-- Object construction and destruction
+- Object creation and destruction
 - Alignment support
-
-Tradeoffs
-
-- Allocation is slower than Arena, Pool, and Stack allocators
-- Fragmentation can occur without coalescing
 
 ---
 
 Project Structure
 
 Custom Allocators/
-│
 ├── ArenaAllocator/
 │   ├── include/
-│   ├── tests/
 │   ├── benchmarks/
-│   └── examples/
+│   ├── examples/
+│   └── tests/
 │
 ├── PoolAllocator/
 │   ├── include/
-│   ├── tests/
 │   ├── benchmarks/
-│   └── examples/
+│   ├── examples/
+│   └── tests/
 │
 ├── StackAllocator/
 │   ├── include/
-│   ├── tests/
 │   ├── benchmarks/
-│   └── examples/
+│   ├── examples/
+│   └── tests/
 │
 └── FreeListAllocator/
     ├── include/
-    ├── tests/
     ├── benchmarks/
-    └── examples/
+    ├── examples/
+    └── tests/
+
+---
 
 Build
 
-Compile examples, tests, or benchmarks using a C++23 compiler.
+Example
 
-Example:
+g++ -std=c++23 examples/example.cpp -Iinclude -o example
+./example
 
-g++ -std=c++23 tests/test.cpp -Iinclude -o tests/test
+Benchmark
 
-Purpose
+g++ -std=c++23 benchmarks/benchmark.cpp -Iinclude -o benchmark
+./benchmark
 
-This project was created to deepen understanding of:
+Test
 
-- Manual memory management
-- Allocation strategies
-- Memory alignment
-- Fragmentation
-- Object lifetime management
-- Performance tradeoffs between allocator designs
+g++ -std=c++23 tests/test.cpp -Iinclude -o test
+./test
+
+---
 
 License
 
-This project is provided for educational purposes.
+MIT License
