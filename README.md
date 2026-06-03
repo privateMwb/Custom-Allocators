@@ -69,30 +69,78 @@ A general-purpose allocator using a free list of memory blocks.
 # Project Structure
 
 ```txt
-Custom Allocators/
+CustomAllocators/
 ├── ArenaAllocator/
 │   ├── include/
-│   ├── benchmarks/
+│   │   └── ArenaAllocator.h
+│   │
+│   ├── tests/
+│   │   └── test.cpp
+│   │
 │   ├── examples/
-│   └── tests/
+│   │   └── examples.cpp
+│   │
+│   ├── benchmarks/
+│   │   └── benchmarks.cpp
+│   │
+│   └── build/
+│       ├── test
+│       ├── examples
+│       └── benchmarks
 │
 ├── PoolAllocator/
 │   ├── include/
-│   ├── benchmarks/
+│   │   └── PoolAllocator.h
+│   │
+│   ├── tests/
+│   │   └── test.cpp
+│   │
 │   ├── examples/
-│   └── tests/
+│   │   └── examples.cpp
+│   │
+│   ├── benchmarks/
+│   │   └── benchmarks.cpp
+│   │
+│   └── build/
+│       ├── test
+│       ├── examples
+│       └── benchmarks
 │
 ├── StackAllocator/
 │   ├── include/
-│   ├── benchmarks/
+│   │   └── StackAllocator.h
+│   │
+│   ├── tests/
+│   │   └── test.cpp
+│   │
 │   ├── examples/
-│   └── tests/
+│   │   └── examples.cpp
+│   │
+│   ├── benchmarks/
+│   │   └── benchmarks.cpp
+│   │
+│   └── build/
+│       ├── test
+│       ├── examples
+│       └── benchmarks
 │
 ├── FreeListAllocator/
 │   ├── include/
-│   ├── benchmarks/
+│   │   └── FreeListAllocator.h
+│   │
+│   ├── tests/
+│   │   └── test.cpp
+│   │
 │   ├── examples/
-│   └── tests/
+│   │   └── examples.cpp
+│   │
+│   ├── benchmarks/
+│   │   └── benchmarks.cpp
+│   │
+│   └── build/
+│       ├── test
+│       ├── examples
+│       └── benchmarks
 │
 ├── README.md
 └── LICENSE
