@@ -72,7 +72,9 @@ A general-purpose allocator using a free list of memory blocks.
 CustomAllocators/
 ├── ArenaAllocator/
 │   ├── include/
-│   │   └── ArenaAllocator.h
+│   │   ├── ArenaAllocator.h
+│   │   ├── ArenaAllocator.tpp
+│   │   └── ArenaScope.h
 │   │
 │   ├── tests/
 │   │   └── test.cpp
@@ -90,7 +92,8 @@ CustomAllocators/
 │
 ├── PoolAllocator/
 │   ├── include/
-│   │   └── PoolAllocator.h
+│   │   ├── PoolAllocator.h
+│   │   └── PoolAllocator.tpp
 │   │
 │   ├── tests/
 │   │   └── test.cpp
@@ -108,7 +111,9 @@ CustomAllocators/
 │
 ├── StackAllocator/
 │   ├── include/
-│   │   └── StackAllocator.h
+│   │   ├── StackAllocator.h
+│   │   ├── StackAllocator.tpp
+│   │   └── StackScope.h
 │   │
 │   ├── tests/
 │   │   └── test.cpp
@@ -126,7 +131,8 @@ CustomAllocators/
 │
 ├── FreeListAllocator/
 │   ├── include/
-│   │   └── FreeListAllocator.h
+│   │   ├── FreeListAllocator.h
+│   │   └── FreeListAllocator.tpp
 │   │
 │   ├── tests/
 │   │   └── test.cpp
