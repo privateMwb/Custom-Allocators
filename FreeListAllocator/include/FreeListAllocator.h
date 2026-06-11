@@ -1,75 +1,85 @@
-#pragma once 
+#pragma once
 
 #include <cstddef>
 #include <new>
 #include <utility>
 
-using std::byte;
-using std::size_t;
-
 class FreeListAllocator {
-    private:
+public:
+    // Debug Statistics
+    struct Stats {
+        std::size_t totalAllocated = 0;
+        std::size_t currentUsed    = 0;
+        std::size_t peakUsed       = 0;
+        std::size_t allocations    = 0;
+        std::size_t deallocations  = 0;
+    };
+
+private:
     // Free Block
     struct FreeBlock {
-        size_t size;
-        FreeBlock* next;
+        std::size_t size;
+        FreeBlock*  next;
     };
-    
+
     // Allocation Header
     struct AllocationHeader {
-        size_t size;
-        size_t adjustment;
+        std::size_t size;
+        std::size_t adjustment;
     };
-    
+
     // Core Memory
-    byte* memory;
-    
+    std::byte* memory;
+
     // Configuration
-    size_t cap;
-    size_t alignment;
-    size_t usedMemory;
-    
+    std::size_t cap;
+    std::size_t alignment;
+    std::size_t usedMemory;
+
     // Free List
     FreeBlock* freeList;
-    
+
+    // Debug Stats
+    Stats stats;
+
     // Alignment Utilities
-    static size_t alignForward(size_t ptr, size_t alignment);
-    
+    [[nodiscard]] static constexpr std::size_t alignForward(std::size_t ptr, std::size_t alignment) noexcept;
+    [[nodiscard]] static constexpr bool isPowerOfTwo(std::size_t value) noexcept;
+
     // Free List Management
-    void coalesce();
-    
-    public:
+    void coalesce() noexcept;
+
+public:
     // Constructors & Destructor
-    explicit FreeListAllocator(size_t size, size_t alignment = alignof(std::max_align_t));
+    explicit FreeListAllocator(std::size_t size, std::size_t alignment = alignof(std::max_align_t));
     ~FreeListAllocator();
-    
-    FreeListAllocator(const FreeListAllocator&) = delete;
+
+    FreeListAllocator(const FreeListAllocator&)            = delete;
     FreeListAllocator& operator=(const FreeListAllocator&) = delete;
-    
+
     FreeListAllocator(FreeListAllocator&& other) noexcept;
     FreeListAllocator& operator=(FreeListAllocator&& other) noexcept;
-    
+
     // Memory Management
-    void* allocate(size_t size, size_t request_alignment = alignof(std::max_align_t));
-    
-    void deallocate(void* ptr);
-    
+    [[nodiscard]] void* allocate(std::size_t size, std::size_t request_alignment = alignof(std::max_align_t)) noexcept;
+
+    void deallocate(void* ptr) noexcept;
+
     // Object Lifecycle
     template<typename T, typename... Args>
-    T* create(Args&&... args);
-    
+    [[nodiscard]] T* create(Args&&... args);
+
     template<typename T>
     void destroy(T* ptr);
-    
-    // Debug / Safety
-    bool owns(void* ptr) const noexcept;
-    
-    // Capacity
-    size_t used() const noexcept;
-    size_t remaining() const noexcept;
-    size_t capacity() const noexcept;
+
+    // Introspection
+    [[nodiscard]] bool owns(const void* ptr) const noexcept;
+
+    [[nodiscard]] const Stats& getStats() const noexcept;
+
+    [[nodiscard]] std::size_t used()      const noexcept;
+    [[nodiscard]] std::size_t remaining() const noexcept;
+    [[nodiscard]] std::size_t capacity()  const noexcept;
 };
 
 #include "FreeListAllocator.tpp"
-
-

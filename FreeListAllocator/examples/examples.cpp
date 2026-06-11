@@ -1,153 +1,159 @@
-#include <iostream>
-#include <cstdint>
+// FreeListAllocator Examples
+// Demonstrates basic usage of the free-list allocator:
+//
+// - basic allocation (allocate/deallocate)
+// - object lifecycle (create/destroy)
+// - deallocation and block reuse
+// - coalescing of adjacent free blocks
+// - pointer ownership checks
+// - out-of-memory handling
+// - move construction and move assignment
+//
+// These examples illustrate the core features and intended usage of FreeListAllocator.
 
 #include "FreeListAllocator.h"
 
-using std::cout;
-using std::size_t;
+// Basic Allocation
+// shows allocate() and deallocate() usage
+void basicAllocation() {
+	FreeListAllocator allocator(256);
 
-struct Object {
-    int x, y, z;
-    
-    Object(int a, int b, int c) :
-    x(a),
-    y(b),
-    z(c) {}
-};
+	void* a = allocator.allocate(sizeof(int), alignof(int));
+	void* b = allocator.allocate(sizeof(int), alignof(int));
+	void* c = allocator.allocate(sizeof(int), alignof(int));
 
-struct alignas(32) SIMDObject {
-    float data[8];
-};
+	*static_cast<int*>(a) = 1;
+	*static_cast<int*>(b) = 2;
+	*static_cast<int*>(c) = 3;
 
-void display(FreeListAllocator& fl) {
-    cout << "Used: " << fl.used() << "\n";
-    cout << "Remaining: " << fl.remaining() << "\n";
-    cout << "Capacity: " << fl.capacity() << "\n\n";
+	allocator.deallocate(a);
+	allocator.deallocate(b);
+	allocator.deallocate(c);
 }
 
-void basic_allocation() {
-    FreeListAllocator fl(256);
-    
-    cout << "Basic Allocation Example\n\n";
-    cout << "Default:\n";
-    display(fl);
-    
-    void* a = fl.allocate(16);
-    void* b = fl.allocate(32);
-    void* c = fl.allocate(8);
-    
-    cout << "After Allocation:\n";
-    display(fl);
-    
-    cout << "a: " << a << "\n";
-    cout << "b: " << b << "\n";
-    cout << "c: " << c << "\n\n";
+// Lifecycle
+// shows object construction and destruction using create<T>() and destroy<T>()
+void lifecycle() {
+	struct Vec3 {
+		float x, y, z;
+		Vec3(float x, float y, float z) : x(x), y(y), z(z) {}
+		~Vec3() {}
+	};
+
+	FreeListAllocator allocator(256);
+
+	Vec3* v = allocator.create<Vec3>(1.0f, 2.0f, 3.0f);
+	allocator.destroy(v);
 }
 
-void reuse_usage() {
-    FreeListAllocator fl(256);
-    
-    cout << "Reuse Usage Example\n\n";
-    cout << "Default:\n";
-    display(fl);
-    
-    void* a = fl.allocate(16);
-    
-    cout << "After First Allocation:\n";
-    display(fl);
-    
-    cout << "a: " << a << "\n\n";
-    
-    fl.deallocate(a);
+// Deallocate Reuse
+// shows that a deallocated block is immediately available for reuse
+void deallocateReuse() {
+	FreeListAllocator allocator(256);
 
-    void* b = fl.allocate(16);
-    
-    cout << "After Second Allocation:\n";
-    display(fl);
-    
-    cout << "b: " << b << "\n\n";
+	void* a = allocator.allocate(sizeof(int), alignof(int));
+	allocator.deallocate(a);
+
+	// Same or equivalent block is returned
+	void* b = allocator.allocate(sizeof(int), alignof(int));
+	(void)b;
+	allocator.deallocate(b);
 }
 
-void object_creation_usage() {
-    FreeListAllocator fl(256);
-    
-    cout << "Object Creation Example\n\n";
-    cout << "Default:\n";
-    display(fl);
-    
-    Object* obj = fl.create<Object>(12, 89, 99);
-    
-    cout << "After Object Creation:\n";
-    display(fl);
-    
-    cout << "obj->x: " << obj->x << "\n";
-    cout << "obj->y: " << obj->y << "\n";
-    cout << "obj->z: " << obj->z << "\n\n";
-    
-    fl.destroy(obj);
-    
-    cout << "After Object Destroy\n";
-    display(fl);
+// Coalesce
+// shows adjacent free blocks merging back into one after deallocation
+void coalesce() {
+	FreeListAllocator allocator(256);
+
+	void* a = allocator.allocate(sizeof(int), alignof(int));
+	void* b = allocator.allocate(sizeof(int), alignof(int));
+	void* c = allocator.allocate(sizeof(int), alignof(int));
+
+	allocator.deallocate(a);
+	allocator.deallocate(b);
+	allocator.deallocate(c);
+
+	// No suitable block found — coalesce triggered inside allocate(), large allocation fits
+	void* large = allocator.allocate(128, alignof(std::max_align_t));
+	(void)large;
+	allocator.deallocate(large);
 }
 
-void alignment_usage() {
-    size_t alignment = alignof(SIMDObject);
-    
-    FreeListAllocator fl(256, alignment);
-    
-    cout << "Alignment Usage Example\n\n";
-    cout << "Default:\n";
-    display(fl);
-    
-    SIMDObject* obj = fl.create<SIMDObject>();
-    
-    uintptr_t address = reinterpret_cast<uintptr_t>(obj);
-    
-    cout << "After Aligned Allocation:\n";
-    display(fl);
-    
-    cout << "address: " << obj << "\n";
-    cout << "address % " << alignment << " == 0: " << 
-    (address % alignment == 0 ? "True" : "False") << "\n\n";
+// Owns
+// shows pointer ownership boundary checks using owns()
+void owns() {
+	FreeListAllocator allocator(256);
+
+	void* inside  = allocator.allocate(sizeof(int), alignof(int));
+	int   outside = 0;
+
+	bool a = allocator.owns(inside);   // true
+	bool b = allocator.owns(&outside); // false
+	bool c = allocator.owns(nullptr);  // false
+
+	(void)a;
+	(void)b;
+	(void)c;
+
+	allocator.deallocate(inside);
 }
 
-void coalesce_usage() {
-    FreeListAllocator fl(256);
-    
-    cout << "Coalesce Usage Example\n\n";
-    cout << "Default:\n";
-    display(fl);
-    
-    void* a = fl.allocate(32);
-    void* b = fl.allocate(32);
-    
-    cout << "After Allocation:\n";
-    display(fl);
-    
-    fl.deallocate(a);
-    fl.deallocate(b);
-    
-    cout << "After Coalescing:\n";
-    display(fl);
-    
-    void* c = fl.allocate(64);
-    
-    cout << "After Allocation:\n";
-    display(fl);
-    
-    cout << "c: " << c << "\n\n";
+// Out of Memory
+// shows graceful nullptr return when the allocator is exhausted
+void oom() {
+	static constexpr std::size_t BLOCK_SIZE = sizeof(int) + sizeof(std::size_t) * 2;
+
+	FreeListAllocator allocator(BLOCK_SIZE);
+
+	void* a = allocator.allocate(sizeof(int), alignof(int)); // ok
+	void* b = allocator.allocate(sizeof(int), alignof(int)); // nullptr — exhausted
+
+	(void)b;
+
+	// Deallocate and try again
+	allocator.deallocate(a);
+	void* c = allocator.allocate(sizeof(int), alignof(int)); // ok — block reused
+	(void)c;
+
+	allocator.deallocate(c);
 }
 
+// Move
+// shows move construction and move assignment, verifying source is zeroed
+void move() {
+	// Move construction
+	{
+		FreeListAllocator allocator(256);
+		void* p = allocator.allocate(sizeof(int), alignof(int));
+		(void)p;
+
+		FreeListAllocator allocator2(std::move(allocator));
+		// allocator  : capacity = 0, used = 0 (zeroed)
+		// allocator2 : owns the buffer, p still valid
+	}
+
+	// Move assignment
+	{
+		FreeListAllocator allocator(256);
+		void* p = allocator.allocate(sizeof(int), alignof(int));
+		(void)p;
+
+		FreeListAllocator allocator2(128);
+		allocator2 = std::move(allocator);
+		// allocator  : capacity = 0, used = 0 (zeroed)
+		// allocator2 : owns the buffer, p still valid
+	}
+}
+
+// Entry Point
 int main() {
-    basic_allocation();
-    
-    reuse_usage();
-    
-    object_creation_usage();
-    
-    alignment_usage();
-    
-    coalesce_usage();
-    
-    return 0;
+	basicAllocation();
+	lifecycle();
+	deallocateReuse();
+	coalesce();
+	owns();
+	oom();
+	move();
+
+	return 0;
 }

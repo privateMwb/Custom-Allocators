@@ -1,77 +1,79 @@
 #pragma once
 
+#include <cassert>
 #include <cstddef>
 #include <new>
 #include <utility>
-
-using std::size_t;
-using std::byte;
+#include <array>
 
 class ArenaAllocator {
 public:
     // Debug Statistics
-	struct Stats {
-		size_t totalAllocated = 0;
-		size_t currentUsed = 0;
-		size_t peakUsed = 0;
-		size_t allocations = 0;
-	};
-	
+    struct Stats {
+        std::size_t totalAllocated = 0;
+        std::size_t currentUsed    = 0;
+        std::size_t peakUsed       = 0;
+        std::size_t allocations    = 0;
+    };
+
 private:
-	// Core Memory
-	byte* memory;
-	size_t cap;
-	size_t offset;
+    // Core Memory
+    std::byte* memory;
+    std::size_t cap;
+    std::size_t offset;
 
-	// Frame Tracking
-	size_t frameStartOffset;
+    // Frame Stack
+    static constexpr std::size_t kMaxFrameDepth = 8;
+    std::array<std::size_t, kMaxFrameDepth> frameStack;
+    std::size_t frameDepth;
 
-	// Debug Stats
-	Stats stats;
-	
-	// Alignment Utilities
-	static size_t alignForward(size_t ptr, size_t alignment);
-	
+    // Debug Stats
+    Stats stats;
+
+    // Alignment Utilities
+    [[nodiscard]] static constexpr std::size_t alignForward(std::size_t value, std::size_t alignment) noexcept;
+    
+    [[nodiscard]] static constexpr bool isPowerOfTwo(std::size_t alignment) noexcept;
+
 public:
-	// Constructors & Destructor
-	explicit ArenaAllocator(size_t size);
-	~ArenaAllocator();
+    // Constructors & Destructor
+    explicit ArenaAllocator(std::size_t size);
+    ~ArenaAllocator();
 
-	ArenaAllocator(const ArenaAllocator&) = delete;
-	ArenaAllocator& operator=(const ArenaAllocator&) = delete;
+    ArenaAllocator(const ArenaAllocator&)            = delete;
+    ArenaAllocator& operator=(const ArenaAllocator&) = delete;
 
-	ArenaAllocator(ArenaAllocator&& other) noexcept;
-	ArenaAllocator& operator=(ArenaAllocator&& other) noexcept;
+    ArenaAllocator(ArenaAllocator&& other) noexcept;
+    ArenaAllocator& operator=(ArenaAllocator&& other) noexcept;
 
-	// Memory Management
-	void* allocate(size_t size, size_t alignment);
-	template<typename T>
-	T* allocate();
+    // Core Allocation
+    [[nodiscard]] void* allocate(std::size_t size, std::size_t alignment) noexcept;
 
-	// Object Lifecycle
-	template<typename T, typename... Args>
-	T* create(Args&&... args);
+    template<typename T>
+    [[nodiscard]] T* allocate() noexcept;
 
-	template<typename T>
-	void destroy(T* ptr);
+    // Object Lifecycle
+    template<typename T, typename... Args>
+    [[nodiscard]] T* create(Args&&... args);
 
-	// Frame Management
-	void beginFrame() noexcept;
-	void endFrame() noexcept;
+    template<typename T>
+    void destroy(T* ptr) noexcept;
 
-	// Debug / Safety
-	bool owns(void* ptr) const noexcept;
+    // Frame Management
+    void beginFrame() noexcept;
+    void endFrame() noexcept;
 
-	// State Management
-	void reset() noexcept;
+    // State Management
+    void reset() noexcept;
 
-	const Stats& getStats() const noexcept;
+    // Introspection
+    [[nodiscard]] bool owns(const void* ptr) const noexcept;
 
-	// Capacity
-	size_t capacity() const noexcept;
-	size_t used() const noexcept;
-	size_t remaining() const noexcept;
+    [[nodiscard]] const Stats& getStats() const noexcept;
+
+    [[nodiscard]] std::size_t capacity() const noexcept;
+    [[nodiscard]] std::size_t used() const noexcept;
+    [[nodiscard]] std::size_t remaining() const noexcept;
 };
 
 #include "ArenaAllocator.tpp"
-

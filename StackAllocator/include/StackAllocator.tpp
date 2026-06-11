@@ -1,132 +1,142 @@
+#include <cassert>
+
 // Alignment Utilities
-inline size_t StackAllocator::alignForward(size_t ptr, size_t alignment) {
+constexpr bool StackAllocator::isPowerOfTwo(std::size_t value) noexcept {
+    return value != 0 && (value & (value - 1)) == 0;
+}
+
+constexpr std::size_t StackAllocator::alignForward(std::size_t ptr, std::size_t alignment) noexcept {
     return (ptr + alignment - 1) & ~(alignment - 1);
 }
 
 // Constructors & Destructor
-inline StackAllocator::StackAllocator(size_t size, size_t alignment) : 
-memory(static_cast<byte*>(::operator new(size, std::align_val_t(alignment)))),
-cap(size),
-offset(0),
-alignment(alignment) {}
+inline StackAllocator::StackAllocator(std::size_t size, std::size_t alignment)
+    : memory(static_cast<std::byte*>(::operator new(size, std::align_val_t(alignment))))
+    , cap(size)
+    , offset(0)
+    , alignment(alignment)
+    , stats{}
+{
+    assert(isPowerOfTwo(alignment) && "alignment must be a non-zero power of two");
+    assert(size > 0                && "size must be > 0");
+}
 
 inline StackAllocator::~StackAllocator() {
     ::operator delete(memory, std::align_val_t(alignment));
-    memory = nullptr;
-    
-    cap = 0;
-    offset = 0;
-    alignment = 0;
 }
 
-inline StackAllocator::StackAllocator(StackAllocator&& other) noexcept :
-memory(other.memory),
-cap(other.cap),
-offset(other.offset),
-alignment(other.alignment) {
-    other.memory = nullptr;
-    other.cap = 0;
-    other.offset = 0;
+inline StackAllocator::StackAllocator(StackAllocator&& other) noexcept
+    : memory(other.memory)
+    , cap(other.cap)
+    , offset(other.offset)
+    , alignment(other.alignment)
+    , stats(other.stats)
+{
+    other.memory    = nullptr;
+    other.cap       = 0;
+    other.offset    = 0;
     other.alignment = 0;
+    other.stats     = {};
 }
 
 inline StackAllocator& StackAllocator::operator=(StackAllocator&& other) noexcept {
-    if(this != &other) {
+    if (this != &other) {
         ::operator delete(memory, std::align_val_t(alignment));
-        
-        memory = other.memory;
-        cap = other.cap;
-        offset = other.offset;
+
+        memory    = other.memory;
+        cap       = other.cap;
+        offset    = other.offset;
         alignment = other.alignment;
-        
-        other.memory = nullptr;
-        other.cap = 0;
-        other.offset = 0;
+        stats     = other.stats;
+
+        other.memory    = nullptr;
+        other.cap       = 0;
+        other.offset    = 0;
         other.alignment = 0;
+        other.stats     = {};
     }
-    
+
     return *this;
 }
 
-// Memory management 
-inline void* StackAllocator::allocate(size_t size, size_t request_alignment) {
-    size_t current = reinterpret_cast<size_t>(memory + offset);
-    
-    size_t aligned = alignForward(current, request_alignment);
-    
-    size_t adjustment = aligned - current;
-    
-    if(offset + adjustment + size > cap) {
+// Memory Management
+inline void* StackAllocator::allocate(std::size_t size, std::size_t request_alignment) noexcept {
+    assert(isPowerOfTwo(request_alignment)  && "request_alignment must be a non-zero power of two");
+    assert(request_alignment <= alignment   && "request_alignment exceeds allocator base alignment");
+
+    std::size_t aligned    = alignForward(offset, request_alignment);
+    std::size_t adjustment = aligned - offset;
+
+    if (offset + adjustment + size > cap) [[unlikely]]
         return nullptr;
-    }
-    
-    byte* ptr = reinterpret_cast<byte*>(aligned);
-    
-    offset += adjustment + size;
-    
+
+    void* ptr = memory + aligned;
+    offset    = aligned + size;
+
+    ++stats.allocations;
+    stats.currentUsed = offset;
+    stats.totalAllocated += adjustment + size;
+    if (offset > stats.peakUsed) [[unlikely]]
+        stats.peakUsed = offset;
+
     return ptr;
 }
-
-inline size_t StackAllocator::getMarker() const noexcept {
+inline std::size_t StackAllocator::getMarker() const noexcept {
     return offset;
 }
 
-inline void StackAllocator::freeToMarker(size_t marker) {
-    if(marker > offset) {
-        return;
-    }
-    
-    offset = marker;
+inline void StackAllocator::freeToMarker(std::size_t marker) noexcept {
+    assert(marker <= offset && "marker exceeds current stack offset");
+
+    offset            = marker;
+    stats.currentUsed = offset;
 }
 
 // Object Lifecycle
 template<typename T, typename... Args>
 T* StackAllocator::create(Args&&... args) {
     void* raw = allocate(sizeof(T), alignof(T));
-    
-    if(raw == nullptr) {
+
+    if (!raw) [[unlikely]]
         return nullptr;
-    }
-    
-    new (raw) T(std::forward<Args>(args)...);
-    
-    return static_cast<T*>(raw);
+
+    return ::new (raw) T(std::forward<Args>(args)...);
 }
 
 template<typename T>
-void StackAllocator::destroy(T* ptr) {
-    if(!owns(ptr)) {
-        return;
-    }
-    
+void StackAllocator::destroy(T* ptr) noexcept {
+    if (!ptr || !owns(ptr)) [[unlikely]] return;
+
     ptr->~T();
 }
 
-// Debug / Safety
-inline bool StackAllocator::owns(void* ptr) const noexcept {
-    byte* address = reinterpret_cast<byte*>(ptr);
-    
-    byte* start = memory;
-    byte* end = memory + cap;
-    
+// State Management
+inline void StackAllocator::reset() noexcept {
+    offset            = 0;
+    stats.currentUsed = 0;
+}
+
+// Introspection
+inline bool StackAllocator::owns(const void* ptr) const noexcept {
+    const auto* address = static_cast<const std::byte*>(ptr);
+    const auto* start   = memory;
+    const auto* end     = memory + cap;
+
     return address >= start && address < end;
 }
 
-// State Management 
-void StackAllocator::clear() {
-    offset = 0;
+inline const StackAllocator::Stats& StackAllocator::getStats() const noexcept {
+    return stats;
 }
 
-// Capacity
-size_t StackAllocator::used() const noexcept {
+inline std::size_t StackAllocator::used() const noexcept {
     return offset;
 }
 
-size_t StackAllocator::remaining() const noexcept {
+inline std::size_t StackAllocator::remaining() const noexcept {
     return cap - offset;
 }
 
-size_t StackAllocator::capacity() const noexcept {
+inline std::size_t StackAllocator::capacity() const noexcept {
     return cap;
 }
-

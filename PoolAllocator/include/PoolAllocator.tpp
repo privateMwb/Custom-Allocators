@@ -1,25 +1,38 @@
-// Alignment Utilities 
-inline size_t PoolAllocator::alignForward(size_t ptr, size_t alignment) {
-    return (ptr + alignment - 1) & ~(alignment - 1);
+#include <cassert>
+
+// Alignment Utilities
+constexpr bool PoolAllocator::isPowerOfTwo(std::size_t alignment) noexcept {
+	return alignment != 0 && (alignment & (alignment - 1)) == 0;
+}
+
+constexpr std::size_t PoolAllocator::alignForward(std::size_t value, std::size_t alignment) noexcept {
+	return (value + alignment - 1) & ~(alignment - 1);
 }
 
 // Constructors & Destructor
-inline PoolAllocator::PoolAllocator(size_t blockSize, size_t blockCount, size_t alignment) :
-	blockSize(blockSize < sizeof(FreeNode) ? sizeof(FreeNode) : blockSize),
-	blockCount(blockCount),
-	alignment(alignment),
-	freeBlockCount(blockCount) {
-	stride = alignForward(blockSize, alignment);
-	memory = static_cast<byte*>(::operator new(stride * blockCount, std::align_val_t(alignment)));
+inline PoolAllocator::PoolAllocator(std::size_t blockSize,
+                                    std::size_t blockCount,
+                                    std::size_t alignment)
+	: blockSize(blockSize < sizeof(FreeNode) ? sizeof(FreeNode) : blockSize)
+	, stride(alignForward(blockSize < sizeof(FreeNode) ? sizeof(FreeNode) : blockSize, alignment))
+	, blockCount(blockCount)
+	, alignment(alignment)
+	, freeBlockCount(blockCount)
+	, freeList(nullptr)
+	, stats{}
+{
+	assert(isPowerOfTwo(alignment) && "alignment must be a non-zero power of two");
+	assert(blockCount > 0          && "blockCount must be > 0");
+
+	memory   = static_cast<std::byte*>(::operator new(stride * blockCount, std::align_val_t(alignment)));
+
 	freeList = reinterpret_cast<FreeNode*>(memory);
-	
+
 	FreeNode* current = freeList;
 
-	for(size_t i = 0; i<blockCount-1; ++i) {
-		byte* nextBlock = reinterpret_cast<byte*>(current) + stride;
-
-		current->next = reinterpret_cast<FreeNode*>(nextBlock);
-
+	for (std::size_t i = 0; i < blockCount - 1; ++i) {
+		current->next = reinterpret_cast<FreeNode*>(
+		                    reinterpret_cast<std::byte*>(current) + stride);
 		current = current->next;
 	}
 
@@ -28,148 +41,137 @@ inline PoolAllocator::PoolAllocator(size_t blockSize, size_t blockCount, size_t 
 
 inline PoolAllocator::~PoolAllocator() {
 	::operator delete(memory, std::align_val_t(alignment));
-
-	memory = nullptr;
-
-	blockSize = 0;
-	stride = 0;
-	blockCount = 0;
-	alignment = 0;
-	
-	freeBlockCount = 0;
-	
-	freeList = nullptr;
 }
 
-inline PoolAllocator::PoolAllocator(PoolAllocator&& other) noexcept :
-	memory(other.memory),
-	blockSize(other.blockSize),
-	stride(other.stride),
-	blockCount(other.blockCount),
-	alignment(other.alignment),
-	freeBlockCount(other.freeBlockCount),
-	freeList(other.freeList) {
-	other.memory = nullptr;
-	other.blockSize= 0;
-	other.stride = 0;
-	other.blockCount = 0;
-	other.alignment = 0;
+inline PoolAllocator::PoolAllocator(PoolAllocator&& other) noexcept
+	: memory(other.memory)
+	, blockSize(other.blockSize)
+	, stride(other.stride)
+	, blockCount(other.blockCount)
+	, alignment(other.alignment)
+	, freeBlockCount(other.freeBlockCount)
+	, freeList(other.freeList)
+	, stats(other.stats)
+{
+	other.memory         = nullptr;
+	other.blockSize      = 0;
+	other.stride         = 0;
+	other.blockCount     = 0;
+	other.alignment      = 0;
 	other.freeBlockCount = 0;
-	other.freeList = nullptr;
+	other.freeList       = nullptr;
+	other.stats          = {};
 }
 
 inline PoolAllocator& PoolAllocator::operator=(PoolAllocator&& other) noexcept {
-	if(this != &other) {
+	if (this != &other) {
 		::operator delete(memory, std::align_val_t(alignment));
 
-		memory = other.memory;
-		blockSize = other.blockSize;
-		stride = other.stride;
-		blockCount = other.blockCount;
-		alignment = other.alignment;
+		memory         = other.memory;
+		blockSize      = other.blockSize;
+		stride         = other.stride;
+		blockCount     = other.blockCount;
+		alignment      = other.alignment;
 		freeBlockCount = other.freeBlockCount;
-		freeList = other.freeList;
+		freeList       = other.freeList;
+		stats          = other.stats;
 
-		other.memory = nullptr;
-		other.blockSize = 0;
-		other.stride = 0;
-		other.blockCount = 0;
-		other.alignment = 0;
+		other.memory         = nullptr;
+		other.blockSize      = 0;
+		other.stride         = 0;
+		other.blockCount     = 0;
+		other.alignment      = 0;
 		other.freeBlockCount = 0;
-		other.freeList = nullptr;
+		other.freeList       = nullptr;
+		other.stats          = {};
 	}
-	
+
 	return *this;
 }
 
-// Memory Management 
-inline void* PoolAllocator::allocate() {
-    if(freeList == nullptr) {
-        return nullptr;
-    }
-    
-    FreeNode* node = freeList;
-    
-    freeList = freeList->next;
-    
-    --freeBlockCount;
-    
-    return reinterpret_cast<void*>(node);
+// Core Allocation
+inline void* PoolAllocator::allocate() noexcept {
+	if (freeBlockCount == 0) [[unlikely]]
+		return nullptr;
+
+	FreeNode* node = freeList;
+	freeList       = freeList->next;
+
+	--freeBlockCount;
+
+	++stats.allocations;
+	stats.totalAllocated += stride;
+
+	std::size_t used = blockCount - freeBlockCount;
+	if (used > stats.peakUsed) [[unlikely]]
+		stats.peakUsed = used;
+
+	return static_cast<void*>(node);
 }
 
-inline void PoolAllocator::deallocate(void* ptr) {
-    if(ptr == nullptr) {
-        return;
-    }
-    
-    FreeNode* node = reinterpret_cast<FreeNode*>(ptr);
-    
-    node->next = freeList;
-    
-    freeList = node;
-    
-    ++freeBlockCount;
+inline void PoolAllocator::deallocate(void* ptr) noexcept {
+	if (!ptr || !owns(ptr)) [[unlikely]] return;
+
+	FreeNode* node = reinterpret_cast<FreeNode*>(ptr);
+	node->next     = freeList;
+	freeList       = node;
+
+	++freeBlockCount;
+	++stats.deallocations;
 }
 
 // Object Lifecycle
 template<typename T, typename... Args>
 T* PoolAllocator::create(Args&&... args) {
-    if(sizeof(T) > blockSize || alignof(T) > alignment) {
-        return nullptr;
-    }
-    
-    void* raw = allocate();
-    
-    if(raw == nullptr) {
-        return nullptr;
-    } 
-    
-    T* ptr = static_cast<T*>(raw);
-    
-    new (ptr) T(std::forward<Args>(args)...);
-    
-    return ptr;
+	static_assert(sizeof(T) <= sizeof(std::byte) * 512,
+	              "T may be too large for a pool block — verify blockSize");
+
+	if (sizeof(T) > blockSize || alignof(T) > alignment) [[unlikely]]
+		return nullptr;
+
+	void* raw = allocate();
+	if (!raw) [[unlikely]] return nullptr;
+
+	return ::new (raw) T(std::forward<Args>(args)...);
 }
 
 template<typename T>
-void PoolAllocator::destroy(T* ptr) {
-    if(!owns(ptr)) return;
-    
-    ptr->~T();
-    
-    deallocate(ptr);
+void PoolAllocator::destroy(T* ptr) noexcept {
+	if (!ptr || !owns(ptr)) [[unlikely]] return;
+
+	ptr->~T();
+	deallocate(ptr);
 }
 
-// Debug / Safety
-inline bool PoolAllocator::owns(void* ptr) const noexcept {
-    byte* start = memory;
-    byte* end = memory + (stride * blockCount);
-    
-    byte* address = reinterpret_cast<byte*>(ptr);
-    
-    return address >= start && address < end;
+// Introspection
+inline bool PoolAllocator::owns(const void* ptr) const noexcept {
+	const auto* p     = static_cast<const std::byte*>(ptr);
+	const auto* start = memory;
+	const auto* end   = memory + (stride * blockCount);
+
+	return p >= start && p < end;
 }
 
-// Capacity
-size_t PoolAllocator::capacity() const noexcept {
-    return stride * blockCount;
+inline const PoolAllocator::Stats& PoolAllocator::getStats() const noexcept {
+	return stats;
 }
 
-size_t PoolAllocator::usedBlocks() const noexcept {
-    return blockCount - freeBlockCount;
+inline std::size_t PoolAllocator::capacity() const noexcept {
+	return stride * blockCount;
 }
 
-size_t PoolAllocator::freeBlocks() const noexcept {
-    return freeBlockCount;
+inline std::size_t PoolAllocator::usedBlocks() const noexcept {
+	return blockCount - freeBlockCount;
 }
 
-size_t PoolAllocator::totalBlocks() const noexcept {
-    return blockCount;
+inline std::size_t PoolAllocator::freeBlocks() const noexcept {
+	return freeBlockCount;
 }
 
-size_t PoolAllocator::block_size() const noexcept {
-    return blockSize;
+inline std::size_t PoolAllocator::totalBlocks() const noexcept {
+	return blockCount;
 }
 
-
-
+inline std::size_t PoolAllocator::blockStride() const noexcept {
+	return stride;
+}

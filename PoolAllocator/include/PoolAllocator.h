@@ -1,73 +1,82 @@
-#pragma once 
+#pragma once
 
 #include <cstddef>
 #include <new>
 #include <utility>
 
-using std::size_t;
-using std::byte;
-
 class PoolAllocator {
-    private:
+public:
+    // Debug Statistics
+    struct Stats {
+        std::size_t totalAllocated = 0;  
+        std::size_t peakUsed       = 0;  
+        std::size_t allocations    = 0;  
+        std::size_t deallocations  = 0;  
+    };
+
+private:
+    // Free List Node
     struct FreeNode {
         FreeNode* next;
     };
-    
-    // Core Memory;
-    byte* memory;
-    
+
+    // Core Memory
+    std::byte* memory;
+
     // Pool Configuration
-    size_t blockSize;
-    size_t stride;
-    size_t blockCount;
-    size_t alignment;
-    
+    std::size_t blockSize;   
+    std::size_t stride;      
+    std::size_t blockCount;  
+    std::size_t alignment;   
+
     // Usage Tracking
-    size_t freeBlockCount;
-    
+    std::size_t freeBlockCount;
+
     // Free List
     FreeNode* freeList;
-    
+
+    // Debug Stats
+    Stats stats;
+
     // Alignment Utilities
-    static size_t alignForward(size_t ptr, size_t alignment);
-    
-    public:
+
+    [[nodiscard]] static constexpr std::size_t alignForward(std::size_t value, std::size_t alignment) noexcept;
+    [[nodiscard]] static constexpr bool isPowerOfTwo(std::size_t alignment) noexcept;
+
+public:
     // Constructors & Destructor
-    explicit PoolAllocator(size_t blockSize, size_t blockCount, size_t alignment = alignof(std::max_align_t));
+    explicit PoolAllocator(std::size_t blockSize,
+                           std::size_t blockCount,
+                           std::size_t alignment = alignof(std::max_align_t));
     ~PoolAllocator();
-    
-    PoolAllocator(const PoolAllocator&) = delete;
+
+    PoolAllocator(const PoolAllocator&)            = delete;
     PoolAllocator& operator=(const PoolAllocator&) = delete;
-    
+
     PoolAllocator(PoolAllocator&& other) noexcept;
     PoolAllocator& operator=(PoolAllocator&& other) noexcept;
-    
-    // Memory Management
-    void* allocate();
-    void deallocate(void* ptr);
-    
+
+    // Core Allocation
+    [[nodiscard]] void* allocate() noexcept;
+    void deallocate(void* ptr) noexcept;
+
     // Object Lifecycle
     template<typename T, typename... Args>
-    T* create(Args&&... args);
-    
+    [[nodiscard]] T* create(Args&&... args);
+
     template<typename T>
-    void destroy(T* ptr);
-    
-    // Debug / Safety
-    bool owns(void* ptr) const noexcept;
-    
-    // Capacity
-    size_t capacity() const noexcept;
-    size_t usedBlocks() const noexcept;
-    size_t freeBlocks() const noexcept;
-    size_t totalBlocks() const noexcept;
-    size_t block_size() const noexcept;
+    void destroy(T* ptr) noexcept;
+
+    // Introspection
+    [[nodiscard]] bool owns(const void* ptr) const noexcept;
+
+    [[nodiscard]] const Stats& getStats() const noexcept;
+
+    [[nodiscard]] std::size_t capacity()    const noexcept;
+    [[nodiscard]] std::size_t usedBlocks()  const noexcept;
+    [[nodiscard]] std::size_t freeBlocks()  const noexcept;
+    [[nodiscard]] std::size_t totalBlocks() const noexcept;
+    [[nodiscard]] std::size_t blockStride() const noexcept;
 };
 
 #include "PoolAllocator.tpp"
-
-
-
-
-
-
