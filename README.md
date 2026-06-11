@@ -200,9 +200,8 @@ Custom-Allocators/
 │   │   └── test.cpp
 │   ├── examples/
 │   │   └── examples.cpp
-│   ├── benchmarks/
-│   │   └── benchmarks.cpp
-│   └── build/
+│   └── benchmarks/
+│       └── benchmarks.cpp
 │
 ├── PoolAllocator/
 │   ├── include/
@@ -212,9 +211,8 @@ Custom-Allocators/
 │   │   └── test.cpp
 │   ├── examples/
 │   │   └── examples.cpp
-│   ├── benchmarks/
-│   │   └── benchmarks.cpp
-│   └── build/
+│   └── benchmarks/
+│       └── benchmarks.cpp
 │
 ├── StackAllocator/
 │   ├── include/
@@ -225,9 +223,8 @@ Custom-Allocators/
 │   │   └── test.cpp
 │   ├── examples/
 │   │   └── examples.cpp
-│   ├── benchmarks/
-│   │   └── benchmarks.cpp
-│   └── build/
+│   └── benchmarks/
+│       └── benchmarks.cpp
 │
 ├── FreeListAllocator/
 │   ├── include/
@@ -237,9 +234,8 @@ Custom-Allocators/
 │   │   └── test.cpp
 │   ├── examples/
 │   │   └── examples.cpp
-│   ├── benchmarks/
-│   │   └── benchmarks.cpp
-│   └── build/
+│   └── benchmarks/
+│       └── benchmarks.cpp
 │
 ├── README.md
 └── LICENSE
@@ -460,7 +456,7 @@ g++ -std=c++23 examples/examples.cpp -Iinclude -o build/examples
 ### Compile & Run Benchmarks
 
 ```bash
-g++ -std=c++23 benchmarks/benchmarks.cpp -Iinclude -o build/benchmarks
+g++ -std=c++23 benchmarks/benchmarks.cpp -Ibenchmarks -Iinclude -o build/benchmarks
 ./build/benchmarks
 ```
 
